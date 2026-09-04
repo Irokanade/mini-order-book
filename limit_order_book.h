@@ -4,31 +4,36 @@
 struct Limit;
 
 struct Order {
-    Order *next_order;
-    Order *prev_order;
-    Limit *parent_limit;
-    int id_number;
-    int shares;
-    int limit;
-    int entry_time;
-    int event_time;
-    bool buy_or_sell;
+    Order *next_order = nullptr;
+    Order *prev_order = nullptr;
+    Limit *parent_limit = nullptr;
+    int id_number = 0;
+    int shares = 0;
+    int limit = 0;
+    int entry_time = 0;
+    int event_time = 0;
+    bool buy_or_sell = false;
+
+    Order() = default;
+
+    Order(const int id, const bool buy, const int shares_, const int limit_price, const int entry_t)
+        : id_number(id), shares(shares_), limit(limit_price),
+          entry_time(entry_t), event_time(entry_t), buy_or_sell(buy) {}
 };
 
 struct Limit {
-    Limit *parent;
-    Limit *left_child;
-    Limit *right_child;
-    Order *head_order;
-    Order *tail_order;
-    int limit_price;
-    int size;
-    int total_volume;
+    Limit *parent = nullptr;
+    Limit *left_child = nullptr;
+    Limit *right_child = nullptr;
+    Order *head_order = nullptr;
+    Order *tail_order = nullptr;
+    int limit_price = 0;
+    int size = 0;
+    int total_volume = 0;
 
     explicit Limit(const int _limit_price) :
-            parent(nullptr), left_child(nullptr), right_child(nullptr),
             head_order(new Order), tail_order(new Order),
-            limit_price(_limit_price), size(0), total_volume(0) {
+            limit_price(_limit_price) {
         head_order->next_order = tail_order;
         tail_order->prev_order = head_order;
     }
@@ -70,13 +75,12 @@ struct Limit {
 };
 
 struct Book {
-    Limit *buy_tree;
-    Limit *sell_tree;
-    Limit *lowest_sell;
-    Limit *highest_buy;
+    Limit *buy_tree = nullptr;
+    Limit *sell_tree = nullptr;
+    Limit *lowest_sell = nullptr;
+    Limit *highest_buy = nullptr;
 
-    Book() : buy_tree(nullptr), sell_tree(nullptr),
-            lowest_sell(nullptr), highest_buy(nullptr) {}
+    Book() = default;
 };
 
 #endif // LIMIT_ORDER_BOOK_H
