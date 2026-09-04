@@ -25,10 +25,10 @@ struct Limit {
     int size;
     int total_volume;
 
-    Limit(int _limit_price, int _size, int _total_volume) :
+    explicit Limit(const int _limit_price) :
             parent(nullptr), left_child(nullptr), right_child(nullptr),
             head_order(new Order), tail_order(new Order),
-            limit_price(_limit_price), size(_size), total_volume(_total_volume) {
+            limit_price(_limit_price), size(0), total_volume(0) {
         head_order->next_order = tail_order;
         tail_order->prev_order = head_order;
     }
@@ -74,6 +74,9 @@ struct Book {
     Limit *sell_tree;
     Limit *lowest_sell;
     Limit *highest_buy;
+
+    Book() : buy_tree(nullptr), sell_tree(nullptr),
+            lowest_sell(nullptr), highest_buy(nullptr) {}
 };
 
 #endif // LIMIT_ORDER_BOOK_H
