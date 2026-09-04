@@ -1,6 +1,9 @@
 #ifndef LIMIT_ORDER_BOOK_H
 #define LIMIT_ORDER_BOOK_H
 
+#include <ranges>
+#include <unordered_map>
+
 struct Limit;
 
 struct Order {
@@ -80,7 +83,30 @@ struct Book {
     Limit *lowest_sell = nullptr;
     Limit *highest_buy = nullptr;
 
+    std::unordered_map<int, Order *> orders_map;
+    std::unordered_map<int, Limit *> buy_limits_map;
+    std::unordered_map<int, Limit *> sell_limits_map;
+
     Book() = default;
+
+    ~Book() {
+        for (const auto &order: orders_map | std::views::values) {
+            delete order;
+        }
+
+        for (const auto &limit: buy_limits_map | std::views::values) {
+            delete limit;
+        }
+
+        for (const auto &limit: sell_limits_map | std::views::values) {
+            delete limit;
+        }
+    }
+
+    Book(const Book &) = delete;
+    Book &operator=(const Book &) = delete;
+    Book(Book &&) = delete;
+    Book &operator=(Book &&) = delete;
 };
 
 #endif // LIMIT_ORDER_BOOK_H
