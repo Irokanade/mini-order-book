@@ -25,52 +25,53 @@ struct Order {
 };
 
 struct Limit {
+    Order sentinel;
     Limit *parent = nullptr;
     Limit *left_child = nullptr;
     Limit *right_child = nullptr;
-    Order *head_order = nullptr;
-    Order *tail_order = nullptr;
     int limit_price = 0;
     int size = 0;
     int total_volume = 0;
 
-    explicit Limit(const int _limit_price) :
-            head_order(new Order), tail_order(new Order),
-            limit_price(_limit_price) {
-        head_order->next_order = tail_order;
-        tail_order->prev_order = head_order;
+    explicit Limit(const int _limit_price) : limit_price(_limit_price) {
+        sentinel.next_order = &sentinel;
+        sentinel.prev_order = &sentinel;
     }
 
-    ~Limit() {
-        // delete sentinels
-        delete head_order;
-        delete tail_order;
-    }
+    ~Limit() = default;
 
     Limit(const Limit &) = delete;
     Limit &operator=(const Limit &) = delete;
     Limit(Limit &&) = delete;
     Limit &operator=(Limit &&) = delete;
 
-    void append(Order *order) {
-        order->next_order = tail_order;
-        order->prev_order = tail_order->prev_order;
+    [[nodiscard]] bool empty() const noexcept {
+        return sentinel.next_order == &sentinel;
+    }
 
-        tail_order->prev_order->next_order = order;
-        tail_order->prev_order = order;
+    [[nodiscard]] Order *front() const noexcept {
+        return sentinel.next_order;
+    }
 
+    [[nodiscard]] Order *back() const noexcept {
+        return sentinel.prev_order;
+    }
+
+    void append(Order *order) noexcept {
+        order->next_order = &sentinel;
+        order->prev_order = sentinel.prev_order;
+        sentinel.prev_order->next_order = order;
+        sentinel.prev_order = order;
         size++;
         total_volume += order->shares;
         order->parent_limit = this;
     }
 
-    void remove(Order *order) {
+    void remove(Order *order) noexcept {
         Order *prev_order = order->prev_order;
         Order *next_order = order->next_order;
-
         prev_order->next_order = next_order;
         next_order->prev_order = prev_order;
-
         size--;
         total_volume -= order->shares;
         order->parent_limit = nullptr;
