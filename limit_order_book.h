@@ -4,6 +4,8 @@
 #include <ranges>
 #include <unordered_map>
 
+enum class Side : bool { Buy, Sell };
+
 struct Limit;
 
 struct Order {
@@ -15,11 +17,11 @@ struct Order {
     int limit = 0;
     int entry_time = 0;
     int event_time = 0;
-    bool buy_or_sell = false;
+    Side buy_or_sell = Side::Buy;
 
     Order() = default;
 
-    Order(const int id, const bool buy, const int shares_, const int limit_price, const int entry_t)
+    Order(const int id, const Side buy, const int shares_, const int limit_price, const int entry_t)
         : id_number(id), shares(shares_), limit(limit_price),
           entry_time(entry_t), event_time(entry_t), buy_or_sell(buy) {}
 };
