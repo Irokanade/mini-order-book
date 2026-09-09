@@ -111,7 +111,23 @@ public:
         return sell_limits.begin()->first;
     }
 
-    void add_order(uint64_t id, Side side, uint32_t shares, uint32_t limit_price, uint64_t entry_time);
+    template<Side side>
+    void add_order(uint64_t id, uint32_t shares, uint32_t limit_price, uint64_t entry_time) {
+        auto [it, inserted] = orders_map.try_emplace(id, id, side, shares, entry_time);
+        Order *order_ptr = &it->second;
+
+        auto &limits_map = [this]() -> std::map<uint32_t, Limit>& {
+            if constexpr (side == Side::Buy) {
+                return buy_limits;
+            } else {
+                return sell_limits;
+            }
+        }();
+
+        auto [limit_it, limit_inserted] = limits_map.try_emplace(limit_price, limit_price);
+        limit_it->second.append(order_ptr);
+    }
+
     void execute_order(uint64_t id, uint32_t shares, uint64_t event_time);
     void execute_order_at(uint64_t id, uint32_t shares, uint32_t exec_price, uint64_t event_time);
     void cancel_order(uint64_t id, uint32_t shares, uint64_t event_time);
