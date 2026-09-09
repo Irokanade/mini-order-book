@@ -1,6 +1,7 @@
 #ifndef LIMIT_ORDER_BOOK_H
 #define LIMIT_ORDER_BOOK_H
 
+#include <cstdint>
 #include <map>
 #include <unordered_map>
 #include <optional>
@@ -13,26 +14,26 @@ struct Order {
     Order *next_order = nullptr;
     Order *prev_order = nullptr;
     Limit *parent_limit = nullptr;
-    int id_number = 0;
-    int shares = 0;
-    int entry_time = 0;
-    int event_time = 0;
+    uint64_t id_number = 0;
+    uint32_t shares = 0;
+    uint64_t entry_time = 0;
+    uint64_t event_time = 0;
     Side buy_or_sell = Side::Buy;
 
     Order() = default;
 
-    Order(const int id, const Side buy, const int shares_, const int entry_t)
+    Order(const uint64_t id, const Side buy, const uint32_t shares_, const uint64_t entry_t)
         : id_number(id), shares(shares_),
           entry_time(entry_t), event_time(entry_t), buy_or_sell(buy) {}
 };
 
 struct Limit {
     Order sentinel;
-    int limit_price = 0;
+    uint32_t limit_price = 0;
     int size = 0;
-    int total_volume = 0;
+    uint64_t total_volume = 0;
 
-    explicit Limit(const int _limit_price) : limit_price(_limit_price) {
+    explicit Limit(const uint32_t _limit_price) : limit_price(_limit_price) {
         sentinel.next_order = &sentinel;
         sentinel.prev_order = &sentinel;
     }
@@ -76,16 +77,16 @@ struct Limit {
         order->parent_limit = nullptr;
     }
 
-    void reduce(Order &order, const int shares) noexcept {
+    void reduce(Order &order, const uint32_t shares) noexcept {
         order.shares -= shares;
         total_volume -= shares;
     }
 };
 
 class Book {
-    std::map<int, Limit> buy_limits;
-    std::map<int, Limit> sell_limits;
-    std::unordered_map<int, Order> orders_map;
+    std::map<uint32_t, Limit> buy_limits;
+    std::map<uint32_t, Limit> sell_limits;
+    std::unordered_map<uint64_t, Order> orders_map;
 
 public:
     Book() = default;
@@ -96,26 +97,26 @@ public:
     Book(Book &&) = delete;
     Book &operator=(Book &&) = delete;
 
-    [[nodiscard]] std::optional<int> get_best_bid() const noexcept {
+    [[nodiscard]] std::optional<uint32_t> get_best_bid() const noexcept {
         if (buy_limits.empty()) {
             return std::nullopt;
         }
         return buy_limits.rbegin()->first;
     }
 
-    [[nodiscard]] std::optional<int> get_best_ask() const noexcept {
+    [[nodiscard]] std::optional<uint32_t> get_best_ask() const noexcept {
         if (sell_limits.empty()) {
             return std::nullopt;
         }
         return sell_limits.begin()->first;
     }
 
-    void add_order(int id, Side side, int shares, int limit_price, int entry_time);
-    void execute_order(int id, int shares);
-    void execute_order_at(int id, int shares, int exec_price);
-    void cancel_order(int id, int shares);
-    void delete_order(int id);
-    void replace_order(int old_id, int new_id, int shares, int limit_price, int entry_time);
+    void add_order(uint64_t id, Side side, uint32_t shares, uint32_t limit_price, uint64_t entry_time);
+    void execute_order(uint64_t id, uint32_t shares, uint64_t event_time);
+    void execute_order_at(uint64_t id, uint32_t shares, uint32_t exec_price, uint64_t event_time);
+    void cancel_order(uint64_t id, uint32_t shares, uint64_t event_time);
+    void delete_order(uint64_t id, uint64_t event_time);
+    void replace_order(uint64_t old_id, uint64_t new_id, uint32_t shares, uint32_t limit_price, uint64_t entry_time);
 };
 
 #endif // LIMIT_ORDER_BOOK_H
