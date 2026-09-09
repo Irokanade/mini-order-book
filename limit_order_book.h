@@ -1,8 +1,9 @@
 #ifndef LIMIT_ORDER_BOOK_H
 #define LIMIT_ORDER_BOOK_H
 
-#include <ranges>
+#include <map>
 #include <unordered_map>
+#include <optional>
 
 enum class Side : bool { Buy, Sell };
 
@@ -14,23 +15,19 @@ struct Order {
     Limit *parent_limit = nullptr;
     int id_number = 0;
     int shares = 0;
-    int limit = 0;
     int entry_time = 0;
     int event_time = 0;
     Side buy_or_sell = Side::Buy;
 
     Order() = default;
 
-    Order(const int id, const Side buy, const int shares_, const int limit_price, const int entry_t)
-        : id_number(id), shares(shares_), limit(limit_price),
+    Order(const int id, const Side buy, const int shares_, const int entry_t)
+        : id_number(id), shares(shares_),
           entry_time(entry_t), event_time(entry_t), buy_or_sell(buy) {}
 };
 
 struct Limit {
     Order sentinel;
-    Limit *parent = nullptr;
-    Limit *left_child = nullptr;
-    Limit *right_child = nullptr;
     int limit_price = 0;
     int size = 0;
     int total_volume = 0;
@@ -80,36 +77,33 @@ struct Limit {
     }
 };
 
-struct Book {
-    Limit *buy_tree = nullptr;
-    Limit *sell_tree = nullptr;
-    Limit *lowest_sell = nullptr;
-    Limit *highest_buy = nullptr;
+class Book {
+    std::map<int, Limit> buy_limits;
+    std::map<int, Limit> sell_limits;
+    std::unordered_map<int, Order> orders_map;
 
-    std::unordered_map<int, Order *> orders_map;
-    std::unordered_map<int, Limit *> buy_limits_map;
-    std::unordered_map<int, Limit *> sell_limits_map;
-
+public:
     Book() = default;
-
-    ~Book() {
-        for (const auto &order: orders_map | std::views::values) {
-            delete order;
-        }
-
-        for (const auto &limit: buy_limits_map | std::views::values) {
-            delete limit;
-        }
-
-        for (const auto &limit: sell_limits_map | std::views::values) {
-            delete limit;
-        }
-    }
+    ~Book() = default;
 
     Book(const Book &) = delete;
     Book &operator=(const Book &) = delete;
     Book(Book &&) = delete;
     Book &operator=(Book &&) = delete;
+
+    [[nodiscard]] std::optional<int> get_best_bid() const noexcept {
+        if (buy_limits.empty()) {
+            return std::nullopt;
+        }
+        return buy_limits.rbegin()->first;
+    }
+
+    [[nodiscard]] std::optional<int> get_best_ask() const noexcept {
+        if (sell_limits.empty()) {
+            return std::nullopt;
+        }
+        return sell_limits.begin()->first;
+    }
 };
 
 #endif // LIMIT_ORDER_BOOK_H
