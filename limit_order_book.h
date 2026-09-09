@@ -75,6 +75,11 @@ struct Limit {
         total_volume -= order->shares;
         order->parent_limit = nullptr;
     }
+
+    void reduce(Order &order, const int shares) noexcept {
+        order.shares -= shares;
+        total_volume -= shares;
+    }
 };
 
 class Book {
@@ -104,6 +109,13 @@ public:
         }
         return sell_limits.begin()->first;
     }
+
+    void add_order(int id, Side side, int shares, int limit_price, int entry_time);
+    void execute_order(int id, int shares);
+    void execute_order_at(int id, int shares, int exec_price);
+    void cancel_order(int id, int shares);
+    void delete_order(int id);
+    void replace_order(int old_id, int new_id, int shares, int limit_price, int entry_time);
 };
 
 #endif // LIMIT_ORDER_BOOK_H
