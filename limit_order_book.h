@@ -1,10 +1,10 @@
 #ifndef LIMIT_ORDER_BOOK_H
 #define LIMIT_ORDER_BOOK_H
 
+#include <cstddef>
 #include <cstdint>
 #include <map>
 #include <unordered_map>
-#include <optional>
 
 enum class Side : bool { Buy, Sell };
 
@@ -30,7 +30,7 @@ struct Order {
 struct Limit {
     Order sentinel;
     uint32_t limit_price = 0;
-    int size = 0;
+    size_t size = 0;
     uint64_t total_volume = 0;
 
     explicit Limit(const uint32_t _limit_price) : limit_price(_limit_price) {
@@ -97,18 +97,36 @@ public:
     Book(Book &&) = delete;
     Book &operator=(Book &&) = delete;
 
-    [[nodiscard]] std::optional<uint32_t> get_best_bid() const noexcept {
-        if (buy_limits.empty()) {
-            return std::nullopt;
-        }
+    [[nodiscard]] bool buy_limits_empty() const noexcept {
+        return buy_limits.empty();
+    }
+
+    [[nodiscard]] bool sell_limits_empty() const noexcept {
+        return sell_limits.empty();
+    }
+
+    [[nodiscard]] uint32_t get_best_bid() const noexcept {
         return buy_limits.rbegin()->first;
     }
 
-    [[nodiscard]] std::optional<uint32_t> get_best_ask() const noexcept {
-        if (sell_limits.empty()) {
-            return std::nullopt;
-        }
+    [[nodiscard]] uint32_t get_best_ask() const noexcept {
         return sell_limits.begin()->first;
+    }
+
+    [[nodiscard]] uint64_t get_best_bid_size() const noexcept {
+        return buy_limits.rbegin()->second.total_volume;
+    }
+
+    [[nodiscard]] uint64_t get_best_ask_size() const noexcept {
+        return sell_limits.begin()->second.total_volume;
+    }
+
+    [[nodiscard]] size_t get_best_bid_order_count() const noexcept {
+        return buy_limits.rbegin()->second.size;
+    }
+
+    [[nodiscard]] size_t get_best_ask_order_count() const noexcept {
+        return sell_limits.begin()->second.size;
     }
 
     template<Side side>
