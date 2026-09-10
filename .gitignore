@@ -1,2 +1,6 @@
 # ide
 .idea
+
+# cmake build output
+cmake-build-*/
+build/
