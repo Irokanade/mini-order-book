@@ -128,11 +128,52 @@ public:
         limit_it->second.append(order_ptr);
     }
 
-    void execute_order(uint64_t id, uint32_t shares, uint64_t event_time);
-    void execute_order_at(uint64_t id, uint32_t shares, uint32_t exec_price, uint64_t event_time);
-    void cancel_order(uint64_t id, uint32_t shares, uint64_t event_time);
-    void delete_order(uint64_t id, uint64_t event_time);
-    void replace_order(uint64_t old_id, uint64_t new_id, uint32_t shares, uint32_t limit_price, uint64_t entry_time);
+    void delete_order(const uint64_t id) {
+        Order &order = orders_map.at(id);
+        Limit *limit = order.parent_limit;
+        limit->remove(&order);
+
+        if (limit->empty()) {
+            auto &limits_map = order.buy_or_sell == Side::Buy ? buy_limits : sell_limits;
+            limits_map.erase(limit->limit_price);
+        }
+
+        orders_map.erase(id);
+    }
+
+    void cancel_order(const uint64_t id, const uint32_t shares, const uint64_t event_time) {
+        Order &order = orders_map.at(id);
+
+        if (shares == order.shares) {
+            delete_order(id);
+        } else {
+            order.parent_limit->reduce(order, shares);
+            order.event_time = event_time;
+        }
+    }
+
+    void replace_order(const uint64_t old_id, const uint64_t new_id, const uint32_t shares,
+                        const uint32_t limit_price, const uint64_t entry_time) {
+        const Side side = orders_map.at(old_id).buy_or_sell;
+        delete_order(old_id);
+
+        if (side == Side::Buy) {
+            add_order<Side::Buy>(new_id, shares, limit_price, entry_time);
+        } else {
+            add_order<Side::Sell>(new_id, shares, limit_price, entry_time);
+        }
+    }
+
+    void execute_order(const uint64_t id, const uint32_t shares, const uint64_t event_time) {
+        Order &order = orders_map.at(id);
+
+        if (shares == order.shares) {
+            delete_order(id);
+        } else {
+            order.parent_limit->reduce(order, shares);
+            order.event_time = event_time;
+        }
+    }
 };
 
 #endif // LIMIT_ORDER_BOOK_H
