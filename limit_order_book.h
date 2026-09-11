@@ -106,36 +106,22 @@ public:
     Book(Book &&) = delete;
     Book &operator=(Book &&) = delete;
 
-    [[nodiscard]] bool buy_limits_empty() const noexcept {
+    [[nodiscard]] bool bids_empty() const noexcept {
         return buy_limits.empty();
     }
 
-    [[nodiscard]] bool sell_limits_empty() const noexcept {
+    [[nodiscard]] bool asks_empty() const noexcept {
         return sell_limits.empty();
     }
 
-    [[nodiscard]] uint32_t get_best_bid() const noexcept {
-        return buy_limits.rbegin()->first;
+    [[nodiscard]] DepthLevel get_best_bid() const noexcept {
+        const auto &[price, limit] = *buy_limits.rbegin();
+        return {price, limit.total_volume, limit.size};
     }
 
-    [[nodiscard]] uint32_t get_best_ask() const noexcept {
-        return sell_limits.begin()->first;
-    }
-
-    [[nodiscard]] uint64_t get_best_bid_size() const noexcept {
-        return buy_limits.rbegin()->second.total_volume;
-    }
-
-    [[nodiscard]] uint64_t get_best_ask_size() const noexcept {
-        return sell_limits.begin()->second.total_volume;
-    }
-
-    [[nodiscard]] size_t get_best_bid_order_count() const noexcept {
-        return buy_limits.rbegin()->second.size;
-    }
-
-    [[nodiscard]] size_t get_best_ask_order_count() const noexcept {
-        return sell_limits.begin()->second.size;
+    [[nodiscard]] DepthLevel get_best_ask() const noexcept {
+        const auto &[price, limit] = *sell_limits.begin();
+        return {price, limit.total_volume, limit.size};
     }
 
     void get_bid_depth(const size_t n, const std::span<DepthLevel> out) const noexcept {
