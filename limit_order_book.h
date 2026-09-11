@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <stdexcept>
 #include <unordered_map>
 #include <vector>
 
@@ -159,21 +160,15 @@ public:
         return depth;
     }
 
-    template<Side side>
-    void add_order(uint64_t id, uint32_t shares, uint32_t limit_price, uint64_t entry_time) {
+    void add_order(const uint64_t id, const Side side, const uint32_t shares,
+                   const uint32_t limit_price, const uint64_t entry_time) {
         auto [it, inserted] = orders_map.try_emplace(id, id, side, shares, entry_time);
         if (!inserted) {
             throw std::runtime_error("duplicate order id");
         }
         Order *order_ptr = &it->second;
 
-        auto &limits_map = [this]() -> std::map<uint32_t, Limit>& {
-            if constexpr (side == Side::Buy) {
-                return buy_limits;
-            } else {
-                return sell_limits;
-            }
-        }();
+        auto &limits_map = side == Side::Buy ? buy_limits : sell_limits;
 
         auto [limit_it, limit_inserted] = limits_map.try_emplace(limit_price, limit_price);
         limit_it->second.append(order_ptr);
@@ -207,12 +202,7 @@ public:
                         const uint32_t limit_price, const uint64_t entry_time) {
         const Side side = orders_map.at(old_id).buy_or_sell;
         delete_order(old_id);
-
-        if (side == Side::Buy) {
-            add_order<Side::Buy>(new_id, shares, limit_price, entry_time);
-        } else {
-            add_order<Side::Sell>(new_id, shares, limit_price, entry_time);
-        }
+        add_order(new_id, side, shares, limit_price, entry_time);
     }
 
     void execute_order(const uint64_t id, const uint32_t shares, const uint64_t event_time) {
