@@ -207,6 +207,9 @@ public:
 
     void execute_order(const uint64_t id, const uint32_t shares, const uint64_t event_time) {
         Order &order = orders_map.at(id);
+        if (shares > order.shares) {
+            throw std::runtime_error("execution exceeds remaining shares");
+        }
 
         if (shares == order.shares) {
             delete_order(id);
