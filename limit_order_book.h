@@ -1,10 +1,12 @@
 #ifndef LIMIT_ORDER_BOOK_H
 #define LIMIT_ORDER_BOOK_H
 
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <map>
 #include <unordered_map>
+#include <vector>
 
 enum class Side : bool { Buy, Sell };
 
@@ -83,6 +85,12 @@ struct Limit {
     }
 };
 
+struct DepthLevel {
+    uint32_t price;
+    uint64_t volume;
+    size_t order_count;
+};
+
 class Book {
     std::map<uint32_t, Limit> buy_limits;
     std::map<uint32_t, Limit> sell_limits;
@@ -127,6 +135,28 @@ public:
 
     [[nodiscard]] size_t get_best_ask_order_count() const noexcept {
         return sell_limits.begin()->second.size;
+    }
+
+    [[nodiscard]] std::vector<DepthLevel> get_bid_depth(const size_t n) const {
+        std::vector<DepthLevel> depth;
+        depth.reserve(n < buy_limits.size() ? n : buy_limits.size());
+
+        for (auto it = buy_limits.rbegin(); it != buy_limits.rend() && depth.size() < n; ++it) {
+            depth.push_back({it->first, it->second.total_volume, it->second.size});
+        }
+
+        return depth;
+    }
+
+    [[nodiscard]] std::vector<DepthLevel> get_ask_depth(const size_t n) const {
+        std::vector<DepthLevel> depth;
+        depth.reserve(n < sell_limits.size() ? n : sell_limits.size());
+
+        for (auto it = sell_limits.begin(); it != sell_limits.end() && depth.size() < n; ++it) {
+            depth.push_back({it->first, it->second.total_volume, it->second.size});
+        }
+
+        return depth;
     }
 
     template<Side side>
