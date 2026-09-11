@@ -5,9 +5,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <span>
 #include <stdexcept>
 #include <unordered_map>
-#include <vector>
 
 enum class Side : bool { Buy, Sell };
 
@@ -138,26 +138,20 @@ public:
         return sell_limits.begin()->second.size;
     }
 
-    [[nodiscard]] std::vector<DepthLevel> get_bid_depth(const size_t n) const {
-        std::vector<DepthLevel> depth;
-        depth.reserve(n < buy_limits.size() ? n : buy_limits.size());
+    void get_bid_depth(const size_t n, const std::span<DepthLevel> out) const noexcept {
+        size_t i = 0;
 
-        for (auto it = buy_limits.rbegin(); it != buy_limits.rend() && depth.size() < n; ++it) {
-            depth.push_back({it->first, it->second.total_volume, it->second.size});
+        for (auto it = buy_limits.rbegin(); it != buy_limits.rend() && i < n; ++it) {
+            out[i++] = {it->first, it->second.total_volume, it->second.size};
         }
-
-        return depth;
     }
 
-    [[nodiscard]] std::vector<DepthLevel> get_ask_depth(const size_t n) const {
-        std::vector<DepthLevel> depth;
-        depth.reserve(n < sell_limits.size() ? n : sell_limits.size());
+    void get_ask_depth(const size_t n, const std::span<DepthLevel> out) const noexcept {
+        size_t i = 0;
 
-        for (auto it = sell_limits.begin(); it != sell_limits.end() && depth.size() < n; ++it) {
-            depth.push_back({it->first, it->second.total_volume, it->second.size});
+        for (auto it = sell_limits.begin(); it != sell_limits.end() && i < n; ++it) {
+            out[i++] = {it->first, it->second.total_volume, it->second.size};
         }
-
-        return depth;
     }
 
     void add_order(const uint64_t id, const Side side, const uint32_t shares,
