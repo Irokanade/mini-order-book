@@ -1,7 +1,6 @@
 #ifndef LIMIT_ORDER_BOOK_H
 #define LIMIT_ORDER_BOOK_H
 
-#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <map>
@@ -52,11 +51,11 @@ struct Limit {
         return sentinel.next_order == &sentinel;
     }
 
-    [[nodiscard]] Order *front() const noexcept {
+    [[nodiscard]] const Order *front() const noexcept {
         return sentinel.next_order;
     }
 
-    [[nodiscard]] Order *back() const noexcept {
+    [[nodiscard]] const Order *back() const noexcept {
         return sentinel.prev_order;
     }
 
@@ -80,7 +79,10 @@ struct Limit {
         order->parent_limit = nullptr;
     }
 
-    void reduce(Order &order, const uint32_t shares) noexcept {
+    void reduce(Order &order, const uint32_t shares) {
+        if (shares > order.shares) {
+            throw std::runtime_error("execution exceeds remaining shares");
+        }
         order.shares -= shares;
         total_volume -= shares;
     }
@@ -157,7 +159,7 @@ public:
     }
 
     [[nodiscard]] size_t get_orders_at(const uint32_t price, const Side side, const size_t n,
-                       const std::span<L3MBO> out) const noexcept {
+                                       const std::span<L3MBO> out) const noexcept {
         const Limit *limit = find_limit(price, side);
         if (limit == nullptr) {
             return 0;
@@ -223,15 +225,15 @@ public:
     void replace_order(const uint64_t old_id, const uint64_t new_id, const uint32_t shares,
                         const uint32_t limit_price, const uint64_t entry_time) {
         const Side side = orders_map.at(old_id).buy_or_sell;
+        if (orders_map.contains(new_id)) {
+            throw std::runtime_error("replace target id already exists");
+        }
         delete_order(old_id);
         add_order(new_id, side, shares, limit_price, entry_time);
     }
 
     void execute_order(const uint64_t id, const uint32_t shares, const uint64_t event_time) {
         Order &order = orders_map.at(id);
-        if (shares > order.shares) {
-            throw std::runtime_error("execution exceeds remaining shares");
-        }
 
         if (shares == order.shares) {
             delete_order(id);
