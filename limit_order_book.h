@@ -93,10 +93,23 @@ struct L2MBP {
     size_t order_count;
 };
 
+struct L3MBO {
+    uint64_t id;
+    uint64_t entry_time;
+    uint32_t price;
+    uint32_t shares;
+};
+
 class Book {
     std::map<uint32_t, Limit> buy_limits;
     std::map<uint32_t, Limit> sell_limits;
     std::unordered_map<uint64_t, Order> orders_map;
+
+    [[nodiscard]] const Limit *find_limit(const uint32_t price, const Side side) const noexcept {
+        const auto &limits_map = side == Side::Buy ? buy_limits : sell_limits;
+        const auto it = limits_map.find(price);
+        return it == limits_map.end() ? nullptr : &it->second;
+    }
 
 public:
     Book() = default;
@@ -125,20 +138,48 @@ public:
         return {price, limit.total_volume, limit.size};
     }
 
-    void get_bid_depth(const size_t n, const std::span<L2MBP> out) const noexcept {
+    [[nodiscard]] size_t get_bid_depth(const size_t n, const std::span<L2MBP> out) const noexcept {
         size_t i = 0;
-
         for (auto it = buy_limits.rbegin(); it != buy_limits.rend() && i < n; ++it) {
             out[i++] = {it->first, it->second.total_volume, it->second.size};
         }
+
+        return i;
     }
 
-    void get_ask_depth(const size_t n, const std::span<L2MBP> out) const noexcept {
+    [[nodiscard]] size_t get_ask_depth(const size_t n, const std::span<L2MBP> out) const noexcept {
         size_t i = 0;
-
         for (auto it = sell_limits.begin(); it != sell_limits.end() && i < n; ++it) {
             out[i++] = {it->first, it->second.total_volume, it->second.size};
         }
+
+        return i;
+    }
+
+    [[nodiscard]] size_t get_orders_at(const uint32_t price, const Side side, const size_t n,
+                       const std::span<L3MBO> out) const noexcept {
+        const Limit *limit = find_limit(price, side);
+        if (limit == nullptr) {
+            return 0;
+        }
+
+        size_t i = 0;
+        for (const Order *order = limit->front(); order != &limit->sentinel && i < n;
+             order = order->next_order) {
+            out[i++] = {order->id_number, order->entry_time, price, order->shares};
+        }
+
+        return i;
+    }
+
+    [[nodiscard]] uint64_t get_volume_at(const uint32_t price, const Side side) const noexcept {
+        const Limit *limit = find_limit(price, side);
+        return limit == nullptr ? 0 : limit->total_volume;
+    }
+
+    [[nodiscard]] size_t get_order_count_at(const uint32_t price, const Side side) const noexcept {
+        const Limit *limit = find_limit(price, side);
+        return limit == nullptr ? 0 : limit->size;
     }
 
     void add_order(const uint64_t id, const Side side, const uint32_t shares,
