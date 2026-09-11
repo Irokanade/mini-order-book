@@ -162,6 +162,9 @@ public:
     template<Side side>
     void add_order(uint64_t id, uint32_t shares, uint32_t limit_price, uint64_t entry_time) {
         auto [it, inserted] = orders_map.try_emplace(id, id, side, shares, entry_time);
+        if (!inserted) {
+            throw std::runtime_error("duplicate order id");
+        }
         Order *order_ptr = &it->second;
 
         auto &limits_map = [this]() -> std::map<uint32_t, Limit>& {
