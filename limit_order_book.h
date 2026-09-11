@@ -86,7 +86,8 @@ struct Limit {
     }
 };
 
-struct DepthLevel {
+// L2 market by price
+struct L2MBP {
     uint32_t price;
     uint64_t volume;
     size_t order_count;
@@ -114,17 +115,17 @@ public:
         return sell_limits.empty();
     }
 
-    [[nodiscard]] DepthLevel get_best_bid() const noexcept {
+    [[nodiscard]] L2MBP get_best_bid() const noexcept {
         const auto &[price, limit] = *buy_limits.rbegin();
         return {price, limit.total_volume, limit.size};
     }
 
-    [[nodiscard]] DepthLevel get_best_ask() const noexcept {
+    [[nodiscard]] L2MBP get_best_ask() const noexcept {
         const auto &[price, limit] = *sell_limits.begin();
         return {price, limit.total_volume, limit.size};
     }
 
-    void get_bid_depth(const size_t n, const std::span<DepthLevel> out) const noexcept {
+    void get_bid_depth(const size_t n, const std::span<L2MBP> out) const noexcept {
         size_t i = 0;
 
         for (auto it = buy_limits.rbegin(); it != buy_limits.rend() && i < n; ++it) {
@@ -132,7 +133,7 @@ public:
         }
     }
 
-    void get_ask_depth(const size_t n, const std::span<DepthLevel> out) const noexcept {
+    void get_ask_depth(const size_t n, const std::span<L2MBP> out) const noexcept {
         size_t i = 0;
 
         for (auto it = sell_limits.begin(); it != sell_limits.end() && i < n; ++it) {
