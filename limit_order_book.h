@@ -156,15 +156,19 @@ struct L3MBO {
 };
 
 class Book {
-    std::map<uint32_t, Limit> buy_limits;
+    std::map<uint32_t, Limit, std::greater<>> buy_limits;
     std::map<uint32_t, Limit> sell_limits;
     std::unordered_map<uint64_t, Order *> orders_map;
     OrderPool order_pool;
 
     [[nodiscard]] const Limit *find_limit(const uint32_t price, const Side side) const noexcept {
-        const auto &limits_map = side == Side::Buy ? buy_limits : sell_limits;
-        const auto it = limits_map.find(price);
-        return it == limits_map.end() ? nullptr : &it->second;
+        if (side == Side::Buy) {
+            const auto it = buy_limits.find(price);
+            return it == buy_limits.end() ? nullptr : &it->second;
+        }
+
+        const auto it = sell_limits.find(price);
+        return it == sell_limits.end() ? nullptr : &it->second;
     }
 
 public:
@@ -185,7 +189,7 @@ public:
     }
 
     [[nodiscard]] L2MBP get_best_bid() const noexcept {
-        const auto &[price, limit] = *buy_limits.rbegin();
+        const auto &[price, limit] = *buy_limits.begin();
         return {price, limit.total_volume, limit.size};
     }
 
@@ -196,7 +200,7 @@ public:
 
     [[nodiscard]] size_t get_bid_depth(const size_t n, const std::span<L2MBP> out) const noexcept {
         size_t i = 0;
-        for (auto it = buy_limits.rbegin(); it != buy_limits.rend() && i < n; ++it) {
+        for (auto it = buy_limits.begin(); it != buy_limits.end() && i < n; ++it) {
             out[i++] = {it->first, it->second.total_volume, it->second.size};
         }
 
@@ -247,9 +251,13 @@ public:
         Order *order_ptr = order_pool.acquire(id, side, shares, entry_time);
         orders_map[id] = order_ptr;
 
-        auto &limits_map = side == Side::Buy ? buy_limits : sell_limits;
-        auto [limit_it, _] = limits_map.try_emplace(limit_price, limit_price);
-        limit_it->second.append(order_ptr);
+        if (side == Side::Buy) {
+            auto [limit_it, _] = buy_limits.try_emplace(limit_price, limit_price);
+            limit_it->second.append(order_ptr);
+        } else {
+            auto [limit_it, _] = sell_limits.try_emplace(limit_price, limit_price);
+            limit_it->second.append(order_ptr);
+        }
     }
 
     void delete_order(const uint64_t id) {
@@ -263,8 +271,11 @@ public:
         limit->remove(order_ptr);
 
         if (limit->empty()) {
-            auto &limits_map = order_ptr->buy_or_sell == Side::Buy ? buy_limits : sell_limits;
-            limits_map.erase(limit->limit_price);
+            if (order_ptr->buy_or_sell == Side::Buy) {
+                buy_limits.erase(limit->limit_price);
+            } else {
+                sell_limits.erase(limit->limit_price);
+            }
         }
 
         order_pool.release(order_ptr);
