@@ -1,12 +1,15 @@
 #ifndef LIMIT_ORDER_BOOK_H
 #define LIMIT_ORDER_BOOK_H
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <span>
 #include <stdexcept>
 #include <unordered_map>
+#include <vector>
 
 enum class Side : bool { Buy, Sell };
 
@@ -27,6 +30,55 @@ struct Order {
     Order(const uint64_t id, const Side buy, const uint32_t shares_, const uint64_t entry_t)
         : id_number(id), shares(shares_),
           entry_time(entry_t), event_time(entry_t), buy_or_sell(buy) {}
+};
+
+class OrderPool {
+    static constexpr size_t CHUNK_SIZE = 1024;
+    using Chunk = std::array<Order, CHUNK_SIZE>;
+
+    std::vector<std::unique_ptr<Chunk>> chunks;
+    // pointer to free space for order object
+    Order *free_list_head = nullptr;
+
+    void allocate_chunk() {
+        auto new_chunk = std::make_unique<Chunk>();
+        for (size_t i = 0; i < CHUNK_SIZE - 1; ++i) {
+            (*new_chunk)[i].next_order = &(*new_chunk)[i + 1];
+        }
+        (*new_chunk)[CHUNK_SIZE - 1].next_order = free_list_head;
+        free_list_head = &(*new_chunk)[0];
+        chunks.push_back(std::move(new_chunk));
+    }
+
+public:
+    OrderPool() = default;
+
+    OrderPool(const OrderPool &) = delete;
+    OrderPool &operator=(const OrderPool &) = delete;
+    OrderPool(OrderPool &&) = delete;
+    OrderPool &operator=(OrderPool &&) = delete;
+
+    [[nodiscard]] Order *acquire(const uint64_t id, const Side side, const uint32_t shares,
+                                 const uint64_t entry_time) {
+        if (free_list_head == nullptr) {
+            allocate_chunk();
+        }
+
+        Order *order = free_list_head;
+        free_list_head = order->next_order;
+
+        *order = Order(id, side, shares, entry_time);
+        return order;
+    }
+
+    void release(Order *order) noexcept {
+        if (order == nullptr) {
+            return;
+        }
+
+        order->next_order = free_list_head;
+        free_list_head = order;
+    }
 };
 
 struct Limit {
@@ -95,6 +147,7 @@ struct L2MBP {
     size_t order_count;
 };
 
+// L3 market by order
 struct L3MBO {
     uint64_t id;
     uint64_t entry_time;
@@ -105,7 +158,8 @@ struct L3MBO {
 class Book {
     std::map<uint32_t, Limit> buy_limits;
     std::map<uint32_t, Limit> sell_limits;
-    std::unordered_map<uint64_t, Order> orders_map;
+    std::unordered_map<uint64_t, Order *> orders_map;
+    OrderPool order_pool;
 
     [[nodiscard]] const Limit *find_limit(const uint32_t price, const Side side) const noexcept {
         const auto &limits_map = side == Side::Buy ? buy_limits : sell_limits;
@@ -186,45 +240,51 @@ public:
 
     void add_order(const uint64_t id, const Side side, const uint32_t shares,
                    const uint32_t limit_price, const uint64_t entry_time) {
-        auto [it, inserted] = orders_map.try_emplace(id, id, side, shares, entry_time);
-        if (!inserted) {
+        if (orders_map.contains(id)) {
             throw std::runtime_error("duplicate order id");
         }
-        Order *order_ptr = &it->second;
+
+        Order *order_ptr = order_pool.acquire(id, side, shares, entry_time);
+        orders_map[id] = order_ptr;
 
         auto &limits_map = side == Side::Buy ? buy_limits : sell_limits;
-
-        auto [limit_it, limit_inserted] = limits_map.try_emplace(limit_price, limit_price);
+        auto [limit_it, _] = limits_map.try_emplace(limit_price, limit_price);
         limit_it->second.append(order_ptr);
     }
 
     void delete_order(const uint64_t id) {
-        Order &order = orders_map.at(id);
-        Limit *limit = order.parent_limit;
-        limit->remove(&order);
+        const auto it = orders_map.find(id);
+        if (it == orders_map.end()) {
+            throw std::out_of_range("order id not found");
+        }
+
+        Order *order_ptr = it->second;
+        Limit *limit = order_ptr->parent_limit;
+        limit->remove(order_ptr);
 
         if (limit->empty()) {
-            auto &limits_map = order.buy_or_sell == Side::Buy ? buy_limits : sell_limits;
+            auto &limits_map = order_ptr->buy_or_sell == Side::Buy ? buy_limits : sell_limits;
             limits_map.erase(limit->limit_price);
         }
 
-        orders_map.erase(id);
+        order_pool.release(order_ptr);
+        orders_map.erase(it);
     }
 
     void cancel_order(const uint64_t id, const uint32_t shares, const uint64_t event_time) {
-        Order &order = orders_map.at(id);
+        Order *order = orders_map.at(id);
 
-        if (shares == order.shares) {
+        if (shares == order->shares) {
             delete_order(id);
         } else {
-            order.parent_limit->reduce(order, shares);
-            order.event_time = event_time;
+            order->parent_limit->reduce(*order, shares);
+            order->event_time = event_time;
         }
     }
 
     void replace_order(const uint64_t old_id, const uint64_t new_id, const uint32_t shares,
-                        const uint32_t limit_price, const uint64_t entry_time) {
-        const Side side = orders_map.at(old_id).buy_or_sell;
+                       const uint32_t limit_price, const uint64_t entry_time) {
+        const Side side = orders_map.at(old_id)->buy_or_sell;
         if (orders_map.contains(new_id)) {
             throw std::runtime_error("replace target id already exists");
         }
@@ -233,13 +293,13 @@ public:
     }
 
     void execute_order(const uint64_t id, const uint32_t shares, const uint64_t event_time) {
-        Order &order = orders_map.at(id);
+        Order *order = orders_map.at(id);
 
-        if (shares == order.shares) {
+        if (shares == order->shares) {
             delete_order(id);
         } else {
-            order.parent_limit->reduce(order, shares);
-            order.event_time = event_time;
+            order->parent_limit->reduce(*order, shares);
+            order->event_time = event_time;
         }
     }
 };
