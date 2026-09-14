@@ -1,3 +1,0 @@
-/Users/michaelleongjs/michaelleongjs/projects/mini-order-book/build-profile/CMakeFiles/mini_order_book.dir
-/Users/michaelleongjs/michaelleongjs/projects/mini-order-book/build-profile/CMakeFiles/edit_cache.dir
-/Users/michaelleongjs/michaelleongjs/projects/mini-order-book/build-profile/CMakeFiles/rebuild_cache.dir
