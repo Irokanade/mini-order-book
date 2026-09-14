@@ -1,5 +1,6 @@
 # mini-order-book
 
+Header only limit order book built in C++  
 Benchmarked against data from [LOBSTER](https://lobsterdata.com/)
 
 ## Data
